@@ -4,12 +4,14 @@ import { Theme } from '../../constants/Theme';
 import { useColorScheme } from 'react-native';
 import { StorageService, WhisperModel } from '../../services/storage';
 import { audioService } from '../../services/audio';
-import { Check, Download, Server } from 'lucide-react-native';
+import { Check, Download, Server, Eye, EyeOff } from 'lucide-react-native';
+import { Switch } from 'react-native';
 
 export default function SettingsScreen() {
     const colorScheme = useColorScheme();
     const theme = colorScheme === 'dark' ? Theme.dark : Theme.light;
     const [currentModel, setCurrentModel] = useState<WhisperModel>('tiny');
+    const [showTranscription, setShowTranscription] = useState(false);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -19,6 +21,13 @@ export default function SettingsScreen() {
     const loadSettings = async () => {
         const settings = await StorageService.getSettings();
         setCurrentModel(settings.whisperModel);
+        setShowTranscription(settings.showTranscription);
+    };
+
+    const toggleTranscription = async (value: boolean) => {
+        setShowTranscription(value);
+        const settings = await StorageService.getSettings();
+        await StorageService.saveSettings({ ...settings, showTranscription: value });
     };
 
     const handleModelSelect = async (model: WhisperModel) => {
@@ -35,7 +44,7 @@ export default function SettingsScreen() {
                         try {
                             setLoading(true);
                             // Save setting
-                            await StorageService.saveSettings({ whisperModel: model });
+                            await StorageService.saveSettings({ whisperModel: model, showTranscription });
                             setCurrentModel(model);
 
                             // Reload audio service with new model
@@ -45,7 +54,7 @@ export default function SettingsScreen() {
                             console.error('Failed to switch model:', error);
                             Alert.alert("Error", "Failed to switch model. Please check your internet connection.");
                             // Revert setting
-                            await StorageService.saveSettings({ whisperModel: currentModel });
+                            await StorageService.saveSettings({ whisperModel: currentModel, showTranscription });
                             setCurrentModel(currentModel);
                         } finally {
                             setLoading(false);
@@ -114,6 +123,26 @@ export default function SettingsScreen() {
                     description="High accuracy, slower. Best for complex vocabulary."
                     size="~466 MB"
                 />
+            </View>
+
+            <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.gray }]}>Performance & Debug</Text>
+                <View style={[styles.optionCard, { backgroundColor: theme.colors.surface, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+                    <View style={{ flex: 1, marginRight: 16 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                            {showTranscription ? <Eye size={20} color={theme.colors.text} /> : <EyeOff size={20} color={theme.colors.text} />}
+                            <Text style={[styles.optionTitle, { color: theme.colors.text, marginLeft: 10, fontSize: 16 }]}>Show Transcription</Text>
+                        </View>
+                        <Text style={[styles.optionDescription, { color: theme.colors.gray, marginBottom: 0 }]}>
+                            Display real-time text on screen and logs. Disable for better performance.
+                        </Text>
+                    </View>
+                    <Switch
+                        value={showTranscription}
+                        onValueChange={toggleTranscription}
+                        trackColor={{ false: theme.colors.grayLight, true: theme.colors.primary }}
+                    />
+                </View>
             </View>
 
             {loading && (

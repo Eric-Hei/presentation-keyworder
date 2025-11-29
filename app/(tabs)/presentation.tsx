@@ -5,6 +5,7 @@ import { useKeyword } from '../../context/KeywordContext';
 import { Theme } from '../../constants/Theme';
 import { useColorScheme } from 'react-native';
 import { audioService, TranscriptionResult } from '../../services/audio';
+import { StorageService } from '../../services/storage';
 import { KeywordBubble } from '../../components/KeywordBubble';
 import { Mic, MicOff, RotateCcw } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,6 +20,7 @@ export default function PresentationScreen() {
     const [currentList, setCurrentList] = useState(lists.find(l => l.id === listId));
     const [isListening, setIsListening] = useState(false);
     const [transcribedText, setTranscribedText] = useState('');
+    const [showTranscription, setShowTranscription] = useState(false);
     const [isComplete, setIsComplete] = useState(false);
 
     // Keep track of matched keywords to avoid re-matching
@@ -40,11 +42,21 @@ export default function PresentationScreen() {
     }, [listId]);
 
     useEffect(() => {
-        audioService.initialize();
+        const loadSettings = async () => {
+            const settings = await StorageService.getSettings();
+            setShowTranscription(settings.showTranscription);
+        };
+        loadSettings();
+    }, []);
+
+    useEffect(() => {
+        // audioService.initialize() is now called inside startRecording to ensure sequence
 
         const unsubscribe = audioService.addListener((result: TranscriptionResult) => {
-            console.log('[PresentationScreen] Received transcription:', result.text);
-            setTranscribedText(result.text);
+            if (showTranscription) {
+                console.log('[PresentationScreen] Received transcription:', result.text);
+                setTranscribedText(result.text);
+            }
             checkKeywords(result.text);
         });
 
@@ -52,10 +64,13 @@ export default function PresentationScreen() {
         const startRecording = async () => {
             try {
                 console.log('[PresentationScreen] Auto-starting microphone...');
+                // Ensure initialization is complete before starting
+                await audioService.initialize();
                 await audioService.startListening();
                 setIsListening(true);
             } catch (error) {
                 console.error('[PresentationScreen] Failed to auto-start:', error);
+                Alert.alert('Error', 'Failed to start microphone automatically. Please tap the mic button.');
             }
         };
         startRecording();
@@ -273,7 +288,7 @@ export default function PresentationScreen() {
 
             <View style={[styles.footer, { borderTopColor: theme.colors.grayLight }]}>
                 <Text style={[styles.transcription, { color: theme.colors.gray }]}>
-                    {transcribedText || (isListening ? "Listening..." : "Tap mic to start")}
+                    {showTranscription ? (transcribedText || (isListening ? "Listening..." : "Tap mic to start")) : (isListening ? "Listening (Hidden)..." : "Tap mic to start")}
                 </Text>
                 <TouchableOpacity
                     style={[

@@ -17,10 +17,12 @@ export type WhisperModel = 'tiny' | 'base' | 'small';
 
 export interface AppSettings {
     whisperModel: WhisperModel;
+    showTranscription: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
     whisperModel: 'tiny',
+    showTranscription: false,
 };
 
 const STORAGE_KEYS = {
