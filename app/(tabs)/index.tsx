@@ -8,6 +8,7 @@ import { KeywordListItem } from '../../components/KeywordListItem';
 import { KeywordList } from '../../services/storage';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import i18n from '../../services/i18n';
 
 export default function KeywordListScreen() {
     const { lists, saveList, deleteList, setCurrentList } = useKeyword();
@@ -31,21 +32,24 @@ export default function KeywordListScreen() {
         await saveList(newList);
         setNewListName('');
         setIsModalVisible(false);
-        router.push({ pathname: '/(tabs)/edit-list', params: { listId: newList.id } });
+        await saveList(newList);
+        setNewListName('');
+        setIsModalVisible(false);
+        router.push({ pathname: '/edit-list', params: { listId: newList.id } });
     };
 
     const handlePressList = (list: KeywordList) => {
         setCurrentList(list);
-        router.push({ pathname: '/(tabs)/edit-list', params: { listId: list.id } });
+        router.push({ pathname: '/edit-list', params: { listId: list.id } });
     };
 
     const handleDeleteList = (listId: string) => {
         Alert.alert(
-            "Delete List",
-            "Are you sure you want to delete this list?",
+            i18n.t('home_delete_title'),
+            i18n.t('home_delete_msg'),
             [
-                { text: "Cancel", style: "cancel" },
-                { text: "Delete", style: "destructive", onPress: () => deleteList(listId) }
+                { text: i18n.t('home_cancel'), style: "cancel" },
+                { text: i18n.t('home_delete'), style: "destructive", onPress: () => deleteList(listId) }
             ]
         );
     };
@@ -53,7 +57,7 @@ export default function KeywordListScreen() {
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
             <View style={styles.header}>
-                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>My Lists</Text>
+                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{i18n.t('home_title')}</Text>
                 <TouchableOpacity
                     style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
                     onPress={() => setIsModalVisible(true)}
@@ -76,7 +80,7 @@ export default function KeywordListScreen() {
                 ListEmptyComponent={
                     <View style={styles.emptyState}>
                         <Text style={[styles.emptyText, { color: theme.colors.gray }]}>
-                            No lists yet. Create one to get started!
+                            {i18n.t('home_empty')}
                         </Text>
                     </View>
                 }
@@ -94,7 +98,7 @@ export default function KeywordListScreen() {
                 >
                     <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>New List</Text>
+                            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{i18n.t('home_new_list_title')}</Text>
                             <TouchableOpacity onPress={() => setIsModalVisible(false)}>
                                 <X color={theme.colors.icon} size={24} />
                             </TouchableOpacity>
@@ -109,7 +113,7 @@ export default function KeywordListScreen() {
                                     borderColor: theme.colors.grayLight
                                 }
                             ]}
-                            placeholder="List Name (e.g., Q1 Review)"
+                            placeholder={i18n.t('home_new_list_placeholder')}
                             placeholderTextColor={theme.colors.gray}
                             value={newListName}
                             onChangeText={setNewListName}
@@ -120,7 +124,7 @@ export default function KeywordListScreen() {
                             style={[styles.createButton, { backgroundColor: theme.colors.primary }]}
                             onPress={handleCreateList}
                         >
-                            <Text style={styles.createButtonText}>Create List</Text>
+                            <Text style={styles.createButtonText}>{i18n.t('home_create_btn')}</Text>
                         </TouchableOpacity>
                     </View>
                 </KeyboardAvoidingView>

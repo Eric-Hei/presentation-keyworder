@@ -15,14 +15,18 @@ export interface KeywordList {
 
 export type WhisperModel = 'tiny' | 'base' | 'small';
 
+export type AppLanguage = 'system' | 'en' | 'fr';
+
 export interface AppSettings {
     whisperModel: WhisperModel;
     showTranscription: boolean;
+    language: AppLanguage;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
     whisperModel: 'tiny',
     showTranscription: false,
+    language: 'system',
 };
 
 const STORAGE_KEYS = {

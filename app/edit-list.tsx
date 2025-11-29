@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useKeyword } from '../../context/KeywordContext';
-import { Theme } from '../../constants/Theme';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { useKeyword } from '../context/KeywordContext';
+import { Theme } from '../constants/Theme';
 import { useColorScheme } from 'react-native';
 import { Plus, Trash2, Play, ArrowLeft } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import i18n from '../services/i18n';
 
 export default function EditListScreen() {
     const { listId } = useLocalSearchParams<{ listId: string }>();
@@ -56,7 +57,7 @@ export default function EditListScreen() {
     };
 
     const handleStartPresentation = () => {
-        router.push({ pathname: '/(tabs)/presentation', params: { listId } });
+        router.push({ pathname: '/presentation', params: { listId } });
     };
 
     if (!currentList) return null;
@@ -68,17 +69,11 @@ export default function EditListScreen() {
                 style={{ flex: 1 }}
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
             >
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                        <ArrowLeft color={theme.colors.text} size={24} />
-                    </TouchableOpacity>
-                    <Text style={[styles.title, { color: theme.colors.text }]}>{currentList.name}</Text>
-                    <View style={{ width: 24 }} />
-                </View>
+                <Stack.Screen options={{ title: currentList.name, headerBackTitle: i18n.t('header_back') }} />
 
                 <View style={styles.content}>
                     <Text style={[styles.subtitle, { color: theme.colors.gray }]}>
-                        Manage Keywords ({currentList.keywords.length})
+                        {i18n.t('edit_subtitle', { count: currentList.keywords.length })}
                     </Text>
 
                     <FlatList
@@ -99,7 +94,7 @@ export default function EditListScreen() {
                     <View style={[styles.inputContainer, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.grayLight }]}>
                         <TextInput
                             style={[styles.input, { color: theme.colors.text, backgroundColor: theme.colors.background, borderColor: theme.colors.grayLight }]}
-                            placeholder="Add a keyword..."
+                            placeholder={i18n.t('edit_placeholder')}
                             placeholderTextColor={theme.colors.gray}
                             value={newKeyword}
                             onChangeText={setNewKeyword}
@@ -121,7 +116,7 @@ export default function EditListScreen() {
                         onPress={handleStartPresentation}
                     >
                         <Play color="white" size={24} style={{ marginRight: 8 }} />
-                        <Text style={styles.startButtonText}>Start Presentation</Text>
+                        <Text style={styles.startButtonText}>{i18n.t('edit_start_btn')}</Text>
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>

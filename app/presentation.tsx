@@ -1,14 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useKeyword } from '../../context/KeywordContext';
-import { Theme } from '../../constants/Theme';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { useKeyword } from '../context/KeywordContext';
+import { Theme } from '../constants/Theme';
 import { useColorScheme } from 'react-native';
-import { audioService, TranscriptionResult } from '../../services/audio';
-import { StorageService } from '../../services/storage';
-import { KeywordBubble } from '../../components/KeywordBubble';
+import { audioService, TranscriptionResult } from '../services/audio';
+import { StorageService } from '../services/storage';
+import { KeywordBubble } from '../components/KeywordBubble';
 import { Mic, MicOff, RotateCcw } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import i18n from '../services/i18n';
 
 export default function PresentationScreen() {
     const { listId } = useLocalSearchParams<{ listId: string }>();
@@ -172,8 +173,8 @@ export default function PresentationScreen() {
             } catch (error) {
                 console.error('Error starting:', error);
                 Alert.alert(
-                    'Microphone Error',
-                    `Failed to start speech recognition: ${error}\n\nPlease check:\n1. Microphone permission\n2. Whisper model downloaded\n3. Check console logs`
+                    i18n.t('pres_error_mic'),
+                    i18n.t('pres_error_mic_msg', { error: String(error) }) + `\n\n1. Microphone permission\n2. Whisper model downloaded\n3. Check console logs`
                 );
                 setIsListening(false);
             }
@@ -200,12 +201,12 @@ export default function PresentationScreen() {
 
     const handleReset = () => {
         Alert.alert(
-            "Reset Session",
-            "Are you sure you want to reset all keywords?",
+            i18n.t('pres_reset_title'),
+            i18n.t('pres_reset_msg'),
             [
-                { text: "Cancel", style: "cancel" },
+                { text: i18n.t('home_cancel'), style: "cancel" },
                 {
-                    text: "Reset",
+                    text: i18n.t('pres_reset_btn'),
                     style: "destructive",
                     onPress: () => {
                         if (!currentList) return;
@@ -235,17 +236,23 @@ export default function PresentationScreen() {
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
+            <Stack.Screen
+                options={{
+                    title: currentList.name,
+                    headerBackTitle: i18n.t('header_back'),
+                    headerRight: () => (
+                        <TouchableOpacity onPress={handleReset} style={styles.iconButton}>
+                            <RotateCcw size={24} color={theme.colors.text} />
+                        </TouchableOpacity>
+                    )
+                }}
+            />
+
             <View style={styles.header}>
                 <View>
-                    <Text style={[styles.title, { color: theme.colors.text }]}>{currentList.name}</Text>
-                    <Text style={[styles.subtitle, { color: theme.colors.gray }]}>
-                        {progress}% Completed
+                    <Text style={[styles.subtitle, { color: theme.colors.gray, textAlign: 'center' }]}>
+                        {i18n.t('pres_completed', { percent: progress })}
                     </Text>
-                </View>
-                <View style={styles.controls}>
-                    <TouchableOpacity onPress={handleReset} style={styles.iconButton}>
-                        <RotateCcw size={24} color={theme.colors.text} />
-                    </TouchableOpacity>
                 </View>
             </View>
 
@@ -266,10 +273,10 @@ export default function PresentationScreen() {
                     <View style={styles.celebrationContainer}>
                         <Text style={[styles.celebrationEmoji]}>🎉</Text>
                         <Text style={[styles.celebrationText, { color: theme.colors.primary }]}>
-                            Bravo !
+                            {i18n.t('pres_bravo')}
                         </Text>
                         <Text style={[styles.celebrationSubtext, { color: theme.colors.text }]}>
-                            Tout est dit !
+                            {i18n.t('pres_all_said')}
                         </Text>
                     </View>
                 ) : (
@@ -288,7 +295,7 @@ export default function PresentationScreen() {
 
             <View style={[styles.footer, { borderTopColor: theme.colors.grayLight }]}>
                 <Text style={[styles.transcription, { color: theme.colors.gray }]}>
-                    {showTranscription ? (transcribedText || (isListening ? "Listening..." : "Tap mic to start")) : (isListening ? "Listening (Hidden)..." : "Tap mic to start")}
+                    {showTranscription ? (transcribedText || (isListening ? i18n.t('pres_listening') : i18n.t('pres_tap_to_start'))) : (isListening ? i18n.t('pres_listening_hidden') : i18n.t('pres_tap_to_start'))}
                 </Text>
                 <TouchableOpacity
                     style={[

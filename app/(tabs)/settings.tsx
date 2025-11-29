@@ -2,16 +2,18 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { Theme } from '../../constants/Theme';
 import { useColorScheme } from 'react-native';
-import { StorageService, WhisperModel } from '../../services/storage';
+import { StorageService, WhisperModel, AppLanguage } from '../../services/storage';
 import { audioService } from '../../services/audio';
-import { Check, Download, Server, Eye, EyeOff } from 'lucide-react-native';
+import { Check, Download, Server, Eye, EyeOff, Globe } from 'lucide-react-native';
 import { Switch } from 'react-native';
+import i18n, { setAppLanguage } from '../../services/i18n';
 
 export default function SettingsScreen() {
     const colorScheme = useColorScheme();
     const theme = colorScheme === 'dark' ? Theme.dark : Theme.light;
     const [currentModel, setCurrentModel] = useState<WhisperModel>('tiny');
     const [showTranscription, setShowTranscription] = useState(false);
+    const [currentLanguage, setCurrentLanguage] = useState<AppLanguage>('system');
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -22,6 +24,18 @@ export default function SettingsScreen() {
         const settings = await StorageService.getSettings();
         setCurrentModel(settings.whisperModel);
         setShowTranscription(settings.showTranscription);
+        setCurrentLanguage(settings.language);
+    };
+
+    const handleLanguageChange = async (lang: AppLanguage) => {
+        setCurrentLanguage(lang);
+        await setAppLanguage(lang);
+        const settings = await StorageService.getSettings();
+        await StorageService.saveSettings({ ...settings, language: lang });
+        // Force re-render is handled by state update, but i18n changes might need a reload or context.
+        // For simplicity, we rely on React state update to re-render the component with new strings.
+        // However, other components won't update until they re-render.
+        // A full app reload is often best for language changes, but let's try dynamic update.
     };
 
     const toggleTranscription = async (value: boolean) => {
@@ -34,27 +48,27 @@ export default function SettingsScreen() {
         if (model === currentModel) return;
 
         Alert.alert(
-            "Change Model",
-            `Switch to ${model.toUpperCase()} model? This may require downloading a new model file.`,
+            i18n.t('settings_switch_title'),
+            i18n.t('settings_switch_msg', { model: model.toUpperCase() }),
             [
-                { text: "Cancel", style: "cancel" },
+                { text: i18n.t('home_cancel'), style: "cancel" },
                 {
-                    text: "Switch",
+                    text: i18n.t('settings_switch_btn'),
                     onPress: async () => {
                         try {
                             setLoading(true);
                             // Save setting
-                            await StorageService.saveSettings({ whisperModel: model, showTranscription });
+                            await StorageService.saveSettings({ whisperModel: model, showTranscription, language: currentLanguage });
                             setCurrentModel(model);
 
                             // Reload audio service with new model
                             await audioService.reloadModel();
-                            Alert.alert("Success", `Switched to ${model} model successfully.`);
+                            Alert.alert(i18n.t('settings_success_title'), i18n.t('settings_success_msg', { model }));
                         } catch (error) {
                             console.error('Failed to switch model:', error);
-                            Alert.alert("Error", "Failed to switch model. Please check your internet connection.");
+                            Alert.alert(i18n.t('settings_error_title'), i18n.t('settings_error_msg'));
                             // Revert setting
-                            await StorageService.saveSettings({ whisperModel: currentModel, showTranscription });
+                            await StorageService.saveSettings({ whisperModel: currentModel, showTranscription, language: currentLanguage });
                             setCurrentModel(currentModel);
                         } finally {
                             setLoading(false);
@@ -96,45 +110,72 @@ export default function SettingsScreen() {
     return (
         <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
             <View style={styles.header}>
-                <Text style={[styles.title, { color: theme.colors.text }]}>Settings</Text>
+                <Text style={[styles.title, { color: theme.colors.text }]}>{i18n.t('settings_title')}</Text>
             </View>
 
             <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: theme.colors.gray }]}>Speech Recognition Model</Text>
+                <Text style={[styles.sectionTitle, { color: theme.colors.gray }]}>{i18n.t('settings_language')}</Text>
                 <Text style={[styles.sectionDescription, { color: theme.colors.gray }]}>
-                    Choose a model that balances speed and accuracy. Larger models are more accurate but slower and require more storage.
+                    {i18n.t('settings_language_desc')}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                    {(['system', 'en', 'fr'] as AppLanguage[]).map((lang) => (
+                        <TouchableOpacity
+                            key={lang}
+                            style={[
+                                styles.langButton,
+                                {
+                                    backgroundColor: currentLanguage === lang ? theme.colors.primary : theme.colors.surface,
+                                    borderColor: currentLanguage === lang ? theme.colors.primary : 'transparent',
+                                    borderWidth: 1
+                                }
+                            ]}
+                            onPress={() => handleLanguageChange(lang)}
+                        >
+                            <Text style={{ color: currentLanguage === lang ? 'white' : theme.colors.text, fontWeight: '600' }}>
+                                {lang === 'system' ? 'System' : lang.toUpperCase()}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </View>
+
+            <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.gray }]}>{i18n.t('settings_model_title')}</Text>
+                <Text style={[styles.sectionDescription, { color: theme.colors.gray }]}>
+                    {i18n.t('settings_model_desc')}
                 </Text>
 
                 <ModelOption
                     model="tiny"
-                    label="Tiny (Default)"
-                    description="Fastest, lowest memory usage. Good for simple keywords."
+                    label={i18n.t('settings_model_tiny')}
+                    description={i18n.t('settings_model_tiny_desc')}
                     size="~75 MB"
                 />
                 <ModelOption
                     model="base"
-                    label="Base"
-                    description="Better accuracy, slightly slower. Recommended for most users."
+                    label={i18n.t('settings_model_base')}
+                    description={i18n.t('settings_model_base_desc')}
                     size="~142 MB"
                 />
                 <ModelOption
                     model="small"
-                    label="Small"
-                    description="High accuracy, slower. Best for complex vocabulary."
+                    label={i18n.t('settings_model_small')}
+                    description={i18n.t('settings_model_small_desc')}
                     size="~466 MB"
                 />
             </View>
 
             <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: theme.colors.gray }]}>Performance & Debug</Text>
+                <Text style={[styles.sectionTitle, { color: theme.colors.gray }]}>{i18n.t('settings_perf_title')}</Text>
                 <View style={[styles.optionCard, { backgroundColor: theme.colors.surface, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
                     <View style={{ flex: 1, marginRight: 16 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                             {showTranscription ? <Eye size={20} color={theme.colors.text} /> : <EyeOff size={20} color={theme.colors.text} />}
-                            <Text style={[styles.optionTitle, { color: theme.colors.text, marginLeft: 10, fontSize: 16 }]}>Show Transcription</Text>
+                            <Text style={[styles.optionTitle, { color: theme.colors.text, marginLeft: 10, fontSize: 16 }]}>{i18n.t('settings_show_transcription')}</Text>
                         </View>
                         <Text style={[styles.optionDescription, { color: theme.colors.gray, marginBottom: 0 }]}>
-                            Display real-time text on screen and logs. Disable for better performance.
+                            {i18n.t('settings_show_transcription_desc')}
                         </Text>
                     </View>
                     <Switch
@@ -148,7 +189,7 @@ export default function SettingsScreen() {
             {loading && (
                 <View style={styles.loadingOverlay}>
                     <ActivityIndicator size="large" color={theme.colors.primary} />
-                    <Text style={[styles.loadingText, { color: theme.colors.text }]}>Switching model...</Text>
+                    <Text style={[styles.loadingText, { color: theme.colors.text }]}>{i18n.t('settings_switching')}</Text>
                 </View>
             )}
         </ScrollView>
@@ -233,5 +274,12 @@ const styles = StyleSheet.create({
         marginTop: 16,
         fontSize: 16,
         fontWeight: '600',
+    },
+    langButton: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 20,
+        minWidth: 80,
+        alignItems: 'center',
     },
 });
