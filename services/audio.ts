@@ -1,6 +1,7 @@
 import { initWhisper } from 'whisper.rn';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Audio } from 'expo-av';
+import { StorageService, WhisperModel } from './storage';
 
 export interface TranscriptionResult {
     text: string;
@@ -13,7 +14,19 @@ class AudioService {
     private listeners: Array<(result: TranscriptionResult) => void> = [];
     private modelDownloaded: boolean = false;
     private permissionGranted: boolean = false;
+    private permissionGranted: boolean = false;
     private currentSubscription: any = null; // Store subscription to allow stopping
+    private currentModel: WhisperModel = 'tiny';
+    private shouldBeListening: boolean = false; // Track if we INTEND to be listening
+
+    private getModelUrl(model: WhisperModel): string {
+        return `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-${model}.bin`;
+    }
+
+    private getModelPath(model: WhisperModel): string {
+        const modelDir = `${(FileSystem as any).documentDirectory}models/`;
+        return `${modelDir}ggml-${model}.bin`;
+    }
 
     async requestPermissions(): Promise<boolean> {
         try {
@@ -51,9 +64,13 @@ class AudioService {
         }
 
         try {
-            console.log('Starting Whisper initialization...');
+            // Load settings to get selected model
+            const settings = await StorageService.getSettings();
+            this.currentModel = settings.whisperModel;
+            console.log(`Starting Whisper initialization with model: ${this.currentModel}`);
+
             const modelDir = `${(FileSystem as any).documentDirectory}models/`;
-            const modelPath = `${modelDir}ggml-tiny.bin`;
+            const modelPath = this.getModelPath(this.currentModel);
 
             // Check if model directory exists
             const dirInfo = await FileSystem.getInfoAsync(modelDir);
@@ -65,8 +82,8 @@ class AudioService {
             // Check if model file exists
             const fileInfo = await FileSystem.getInfoAsync(modelPath);
             if (!fileInfo.exists) {
-                console.log('Downloading Whisper model (multilingual, ~75MB)...');
-                const modelUrl = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin';
+                console.log(`Downloading Whisper model (${this.currentModel})...`);
+                const modelUrl = this.getModelUrl(this.currentModel);
 
                 await FileSystem.downloadAsync(modelUrl, modelPath);
                 console.log('Model downloaded successfully');
@@ -86,6 +103,15 @@ class AudioService {
             console.error('Failed to initialize Whisper:', error);
             throw new Error(`Whisper initialization failed: ${error}`);
         }
+    }
+
+    async reloadModel() {
+        console.log('[AudioService] Reloading model...');
+        if (this.whisperContext) {
+            await this.whisperContext.release();
+            this.whisperContext = null;
+        }
+        await this.initialize();
     }
 
     async startListening() {
@@ -110,13 +136,14 @@ class AudioService {
         }
 
         this.isListening = true;
+        this.shouldBeListening = true;
         console.log('[AudioService] Starting real-time transcription...');
 
         try {
             const subscription = await this.whisperContext.transcribeRealtime({
                 language: 'fr',
                 maxLen: 1,
-                realtimeAudioSec: 120, // Extended to 2 minutes
+                realtimeAudioSec: 0, // 0 for infinite recording (or max supported by lib)
                 realtimeAudioSliceSec: 25, // Process in 25-second chunks
                 // Configure Audio Session for iOS explicitly
                 audioSessionOnStartIos: {
@@ -146,6 +173,19 @@ class AudioService {
                 if (!isCapturing) {
                     console.log('[AudioService] Capture stopped');
                     this.isListening = false;
+
+                    // Auto-restart if we should still be listening
+                    if (this.shouldBeListening) {
+                        console.log('[AudioService] Unexpected stop, restarting...');
+                        // Small delay to prevent tight loops
+                        setTimeout(() => {
+                            if (this.shouldBeListening) {
+                                this.startListening().catch(err => {
+                                    console.error('[AudioService] Failed to auto-restart:', err);
+                                });
+                            }
+                        }, 500);
+                    }
                 }
             });
 
@@ -162,6 +202,8 @@ class AudioService {
     }
 
     async stopListening() {
+        this.shouldBeListening = false; // Explicitly signal we want to stop
+
         if (!this.isListening) {
             console.log('[AudioService] Already stopped, ignoring');
             return;
@@ -195,6 +237,10 @@ class AudioService {
 
     isModelDownloaded(): boolean {
         return this.modelDownloaded;
+    }
+
+    getCurrentModel(): WhisperModel {
+        return this.currentModel;
     }
 }
 
